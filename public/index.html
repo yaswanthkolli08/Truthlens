@@ -1,0 +1,993 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>TruthLens – AI Fake News Detector</title>
+<style>
+:root{
+  --bg:#f4f6fb; --bg2:#e9edf8; --card:rgba(255,255,255,.72); --card-b:rgba(20,30,70,.10);
+  --text:#121a33; --muted:#5b6585; --accent:#6c5ce7; --accent2:#00b8d9;
+  --good:#12b76a; --warn:#f79009; --bad:#f04438; --shadow:0 10px 40px rgba(60,70,140,.15);
+  --chip:rgba(108,92,231,.10); --input:rgba(255,255,255,.9);
+  --blob1:#b9aefc; --blob2:#9be7f5; --blob3:#ffc9d6;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0a0e1f; --bg2:#10162f; --card:rgba(24,31,62,.62); --card-b:rgba(255,255,255,.09);
+    --text:#eef1ff; --muted:#9aa4c7; --accent:#8b7bff; --accent2:#2fd4f0;
+    --good:#32d583; --warn:#fdb022; --bad:#ff6b5e; --shadow:0 12px 50px rgba(0,0,0,.5);
+    --chip:rgba(139,123,255,.16); --input:rgba(10,14,31,.6);
+    --blob1:#4b3fd1; --blob2:#0a7f99; --blob3:#a3265e;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0a0e1f; --bg2:#10162f; --card:rgba(24,31,62,.62); --card-b:rgba(255,255,255,.09);
+  --text:#eef1ff; --muted:#9aa4c7; --accent:#8b7bff; --accent2:#2fd4f0;
+  --good:#32d583; --warn:#fdb022; --bad:#ff6b5e; --shadow:0 12px 50px rgba(0,0,0,.5);
+  --chip:rgba(139,123,255,.16); --input:rgba(10,14,31,.6);
+  --blob1:#4b3fd1; --blob2:#0a7f99; --blob3:#a3265e;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;font-family:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;color:var(--text);
+  background:linear-gradient(160deg,var(--bg),var(--bg2));min-height:100vh;overflow-x:hidden;line-height:1.5}
+.aurora{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.blob{position:absolute;border-radius:50%;filter:blur(80px);opacity:.55;animation:float 18s ease-in-out infinite}
+.b1{width:420px;height:420px;background:var(--blob1);top:-120px;left:-100px}
+.b2{width:380px;height:380px;background:var(--blob2);bottom:-120px;right:-80px;animation-delay:-6s}
+.b3{width:300px;height:300px;background:var(--blob3);top:40%;left:55%;animation-delay:-12s;opacity:.35}
+@keyframes float{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(40px,-30px) scale(1.1)}66%{transform:translate(-30px,40px) scale(.95)}}
+.wrap{position:relative;z-index:1;max-width:860px;margin:0 auto;padding:22px 16px 60px}
+header{display:flex;align-items:center;justify-content:space-between;gap:10px;animation:rise .7s both}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:20px;letter-spacing:-.3px}
+.logo{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;color:#fff;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));box-shadow:0 6px 20px rgba(108,92,231,.45)}
+.theme{border:1px solid var(--card-b);background:var(--card);color:var(--text);width:40px;height:40px;border-radius:12px;cursor:pointer;
+  backdrop-filter:blur(12px);font-size:18px;transition:transform .25s}
+.theme:hover{transform:rotate(25deg) scale(1.08)}
+.hero{text-align:center;margin:34px 0 22px;animation:rise .8s .08s both}
+.pill{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border-radius:99px;background:var(--chip);color:var(--accent);font-size:13px;font-weight:600}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--good);box-shadow:0 0 0 0 var(--good);animation:pulse 2s infinite}
+@keyframes pulse{70%{box-shadow:0 0 0 9px transparent}100%{box-shadow:0 0 0 0 transparent}}
+h1{font-size:clamp(30px,7vw,52px);line-height:1.08;margin:16px 0 10px;letter-spacing:-1.2px;font-weight:800}
+.grad{background:linear-gradient(90deg,var(--accent),var(--accent2),#ff5fa2,var(--accent));background-size:300% 100%;
+  -webkit-background-clip:text;background-clip:text;color:transparent;animation:shine 6s linear infinite}
+@keyframes shine{to{background-position:300% 0}}
+.sub{color:var(--muted);max-width:560px;margin:0 auto;font-size:16px}
+.card{background:var(--card);border:1px solid var(--card-b);border-radius:22px;padding:20px;box-shadow:var(--shadow);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+.input-card{animation:rise .8s .16s both}
+label{display:block;font-size:13px;font-weight:700;color:var(--muted);margin:0 0 6px;text-transform:uppercase;letter-spacing:.6px}
+textarea,input[type=text]{width:100%;border:1.5px solid var(--card-b);background:var(--input);color:var(--text);border-radius:14px;padding:13px 14px;font:inherit;font-size:15px;outline:none;transition:border-color .2s, box-shadow .2s}
+textarea{min-height:150px;resize:vertical}
+textarea:focus,input[type=text]:focus{border-color:var(--accent);box-shadow:0 0 0 4px var(--chip)}
+.row{display:grid;gap:14px;margin-bottom:14px}
+.meta{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:6px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:2px 0 16px}
+.chip{border:1px solid var(--card-b);background:var(--chip);color:var(--text);padding:7px 13px;border-radius:99px;font-size:13px;cursor:pointer;transition:transform .2s,background .2s}
+.chip:hover{transform:translateY(-2px);background:var(--accent);color:#fff}
+.actions{display:flex;gap:10px;flex-wrap:wrap}
+.btn{position:relative;overflow:hidden;border:none;cursor:pointer;font:inherit;font-weight:700;font-size:16px;color:#fff;padding:14px 26px;border-radius:14px;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));box-shadow:0 8px 24px rgba(108,92,231,.4);transition:transform .2s,box-shadow .2s;flex:1;min-width:180px}
+.btn:hover{transform:translateY(-2px);box-shadow:0 12px 30px rgba(108,92,231,.55)}
+.btn:active{transform:scale(.98)}
+.btn[disabled]{opacity:.7;cursor:progress}
+.btn::after{content:"";position:absolute;top:0;left:-60%;width:40%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.4),transparent);transform:skewX(-20deg);animation:sweep 3s infinite}
+@keyframes sweep{to{left:140%}}
+.ghost{background:transparent;color:var(--text);border:1.5px solid var(--card-b);box-shadow:none;flex:0 0 auto;min-width:0}
+.ghost::after{display:none}
+.ghost:hover{box-shadow:none;border-color:var(--accent)}
+/* scanning */
+.scan{display:none;text-align:center;padding:36px 10px}
+.scan.on{display:block;animation:rise .4s both}
+.radar{width:120px;height:120px;margin:0 auto 18px;border-radius:50%;position:relative;border:2px solid var(--accent);
+  background:radial-gradient(circle,var(--chip),transparent 70%)}
+.radar::before{content:"";position:absolute;inset:0;border-radius:50%;background:conic-gradient(from 0deg,transparent 70%,var(--accent2));animation:spin 1.3s linear infinite}
+.radar::after{content:"";position:absolute;inset:30px;border-radius:50%;border:1.5px dashed var(--accent);opacity:.6}
+@keyframes spin{to{transform:rotate(360deg)}}
+.steps{color:var(--muted);font-size:14px;min-height:22px}
+/* results */
+#result{display:none;margin-top:22px}
+#result.on{display:block}
+.verdict{display:grid;gap:20px;align-items:center;grid-template-columns:1fr;text-align:center}
+@media(min-width:640px){.verdict{grid-template-columns:220px 1fr;text-align:left}}
+.gauge{position:relative;width:200px;height:200px;margin:0 auto}
+.gauge svg{transform:rotate(-90deg)}
+.gauge .track{stroke:var(--card-b)}
+.gauge .bar{transition:stroke-dashoffset 1.6s cubic-bezier(.2,.8,.2,1),stroke .6s}
+.gauge .num{position:absolute;inset:0;display:grid;place-content:center;text-align:center}
+.gauge .num b{font-size:46px;line-height:1;letter-spacing:-2px}
+.gauge .num span{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:1px}
+.badge{display:inline-flex;align-items:center;gap:8px;padding:8px 16px;border-radius:99px;font-weight:800;font-size:15px;color:#fff}
+.badge.good{background:var(--good)} .badge.warn{background:var(--warn)} .badge.bad{background:var(--bad)}
+.verdict h2{margin:12px 0 6px;font-size:24px;letter-spacing:-.5px}
+.verdict p{margin:0;color:var(--muted)}
+.grid{display:grid;gap:16px;margin-top:16px}
+@media(min-width:640px){.grid{grid-template-columns:1fr 1fr}}
+.card h3{margin:0 0 14px;font-size:16px;display:flex;align-items:center;gap:8px}
+.meter{margin-bottom:14px}
+.meter .top{display:flex;justify-content:space-between;font-size:13px;font-weight:600;margin-bottom:6px}
+.meter .top span:last-child{color:var(--muted)}
+.mbar{height:9px;border-radius:99px;background:var(--card-b);overflow:hidden}
+.mfill{height:100%;width:0;border-radius:99px;transition:width 1.4s cubic-bezier(.2,.8,.2,1)}
+ul.list{list-style:none;padding:0;margin:0;display:grid;gap:10px}
+ul.list li{display:flex;gap:10px;padding:11px 12px;border-radius:12px;background:var(--chip);font-size:14px;opacity:0;transform:translateX(-14px);animation:slide .5s forwards}
+ul.list li i{font-style:normal;flex:0 0 auto}
+@keyframes slide{to{opacity:1;transform:none}}
+.full{grid-column:1/-1}
+.note{margin-top:16px;font-size:12.5px;color:var(--muted);text-align:center}
+.srcline{display:inline-block;margin-top:10px;font-size:12px;padding:4px 10px;border-radius:8px;background:var(--chip);color:var(--muted)}
+.history{margin-top:22px}
+.hitem{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:var(--chip);margin-bottom:8px;cursor:pointer;font-size:14px;transition:transform .2s}
+.hitem:hover{transform:translateX(4px)}
+.hitem .s{font-weight:800;min-width:42px}
+.hitem .t{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.err{display:none;margin-top:14px;padding:12px 14px;border-radius:12px;background:rgba(240,68,56,.12);color:var(--bad);font-size:14px}
+.err.on{display:block}
+footer{text-align:center;color:var(--muted);font-size:12.5px;margin-top:34px}
+@keyframes rise{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:none}}
+.reveal{animation:rise .7s both}
+@media (prefers-reduced-motion: reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+
+/* tabs */
+.tabs{display:flex;gap:6px;padding:5px;border-radius:16px;background:var(--chip);margin-bottom:18px}
+.tab{flex:1;border:none;background:transparent;color:var(--muted);font:inherit;font-weight:700;font-size:14.5px;padding:11px 8px;border-radius:12px;cursor:pointer;transition:all .25s}
+.tab.on{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;box-shadow:0 6px 18px rgba(108,92,231,.35)}
+.panel{animation:rise .5s both}
+/* dropzone */
+.drop{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;padding:30px 16px;border:2px dashed var(--accent);border-radius:18px;background:var(--chip);cursor:pointer;transition:transform .2s,background .2s,border-color .2s}
+.drop:hover,.drop.over{transform:scale(1.01);background:var(--card);border-color:var(--accent2)}
+.drop{position:relative}
+.fileov{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:0;z-index:2}
+.pick{font-style:normal;font-weight:700;color:#fff;background:linear-gradient(135deg,var(--accent),var(--accent2));padding:9px 20px;border-radius:12px;margin-top:6px}
+.drop.has .pick{display:none}
+.drop .dico{font-size:38px;animation:bob 2.6s ease-in-out infinite}
+@keyframes bob{50%{transform:translateY(-7px)}}
+.drop span{font-size:12.5px;color:var(--muted)}
+.drop.has{padding:14px}
+.drop.has .dico{display:none}
+.preview{display:none;gap:14px;align-items:center;flex-wrap:wrap;margin-top:16px}
+.pbox{flex:0 0 auto;width:100%;max-width:340px;border-radius:16px;overflow:hidden;background:#000;box-shadow:var(--shadow);margin:0 auto;position:relative}
+.pbox img,.pbox video{display:block;width:100%;max-height:300px;object-fit:contain;background:#000}
+.pbox.scanning::after{content:"";position:absolute;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,var(--accent2),transparent);box-shadow:0 0 16px var(--accent2);animation:scanline 1.6s ease-in-out infinite}
+@keyframes scanline{0%{top:0}50%{top:calc(100% - 3px)}100%{top:0}}
+.pinfo{flex:1;min-width:180px;font-size:13.5px;color:var(--muted);word-break:break-word}
+
+/* beginner-friendly explanation cards */
+.kicker{display:inline-block;font-size:11.5px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:var(--accent);background:var(--chip);padding:4px 12px;border-radius:99px;margin-bottom:10px}
+.para{margin:0;font-size:15px;line-height:1.7}
+.stack{display:flex;height:16px;border-radius:99px;overflow:hidden;background:var(--card-b);margin:4px 0 12px}
+.seg{height:100%;width:0;transition:width 1.4s cubic-bezier(.2,.8,.2,1)}
+.legend{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:13px;font-weight:700;margin-bottom:12px}
+.legend span{display:inline-flex;align-items:center;gap:7px}
+.legend i{width:10px;height:10px;border-radius:50%;display:inline-block}
+.conf{margin-top:12px;padding:11px 14px;border-radius:12px;background:var(--chip);font-size:13.5px;color:var(--muted)}
+.conf b{color:var(--text)}
+.bottom{margin-top:12px;padding:14px 16px;border-radius:14px;border-left:4px solid var(--accent);background:var(--chip);font-weight:700;font-size:15px}
+ol.why{list-style:none;counter-reset:w;padding:0;margin:0;display:grid;gap:10px}
+ol.why li{counter-increment:w;display:flex;gap:12px;align-items:flex-start;padding:12px;border-radius:12px;background:var(--chip);font-size:14.5px;line-height:1.6;opacity:0;transform:translateX(-14px);animation:slide .5s forwards}
+ol.why li::before{content:counter(w);flex:0 0 26px;height:26px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-weight:800;font-size:13px}
+.terms{display:grid;gap:10px}
+.term{padding:11px 12px;border-radius:12px;background:var(--chip);font-size:14px;line-height:1.55}
+.term b{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="aurora"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div></div>
+
+<div class="wrap">
+  <header>
+    <div class="brand"><div class="logo">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/><path d="M8 11l2.2 2.2L14.5 9"/></svg>
+    </div>TruthLens</div>
+    <button class="theme" id="theme" aria-label="Toggle theme">🌓</button>
+  </header>
+
+  <section class="hero">
+    <span class="pill"><span class="dot"></span> AI-powered • <span id="today"></span></span>
+    <h1>Is that news <span class="grad">real or fake?</span></h1>
+    <p class="sub">Paste a headline or article to check if it is fake. You can also upload an image or video to find out whether it was made by AI. Get a clear score in seconds.</p>
+  </section>
+
+  <section class="card input-card">
+    <div class="tabs">
+      <button class="tab on" id="tabT">📰 News Text</button>
+      <button class="tab" id="tabM">🖼️ Image / Video</button>
+    </div>
+
+    <div id="panelText" class="panel">
+      <div class="row">
+        <div>
+          <label for="src">Source / website (optional)</label>
+          <input type="text" id="src" placeholder="e.g. example-news.com or 'WhatsApp forward'" autocomplete="off">
+        </div>
+        <div>
+          <label for="txt">News headline or article</label>
+          <textarea id="txt" placeholder="Paste the news text here…" maxlength="6000"></textarea>
+          <div class="meta"><span>Tip: more text = better accuracy</span><span id="count">0 / 6000</span></div>
+        </div>
+      </div>
+      <div class="chips" id="chips"></div>
+      <div class="actions">
+        <button class="btn" id="go">🔍 Analyze News</button>
+        <button class="btn ghost" id="clear">Clear</button>
+      </div>
+    </div>
+
+    <div id="panelMedia" class="panel" style="display:none">
+      <div class="drop" id="drop">
+        <div class="dico">📤</div>
+        <b id="dropT">Tap to upload, or drop an image / video here</b>
+        <em class="pick">Choose file</em><span>JPG, PNG, WebP, GIF, MP4, WebM, MOV • images up to 20 MB, videos up to 100 MB</span>
+        <input type="file" id="file" class="fileov" accept="image/*,video/*" aria-label="Choose an image or video">
+      </div>
+      <div class="preview" id="preview">
+        <div class="pbox" id="pbox"></div>
+        <div class="pinfo" id="pinfo"></div>
+      </div>
+      <div class="actions" style="margin-top:16px">
+        <button class="btn" id="goM">🧬 Detect AI-Generated</button>
+        <button class="btn ghost" id="clearM">Remove</button>
+      </div>
+    </div>
+
+    <div class="err" id="err"></div>
+  </section>
+
+  <section class="card scan" id="scan" style="margin-top:22px">
+    <div class="radar"></div>
+    <div class="steps" id="steps">Reading the article…</div>
+  </section>
+
+  <section id="result">
+    <div class="card verdict reveal">
+      <div class="gauge">
+        <svg width="200" height="200" viewBox="0 0 200 200">
+          <circle class="track" cx="100" cy="100" r="86" fill="none" stroke-width="16"/>
+          <circle class="bar" id="bar" cx="100" cy="100" r="86" fill="none" stroke-width="16" stroke-linecap="round" stroke-dasharray="540.4" stroke-dashoffset="540.4"/>
+        </svg>
+        <div class="num"><b id="score">0</b><span id="glabel">credibility</span></div>
+      </div>
+      <div>
+        <span class="badge" id="badge"></span>
+        <h2 id="vtitle"></h2>
+        <p id="vsum"></p>
+        <span class="srcline" id="engine"></span>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card full reveal" style="animation-delay:.05s"><h3 id="hAbout">📖 What this is about — in simple words</h3><span class="kicker" id="topic"></span><p class="para" id="about"></p></div>
+      <div class="card full reveal" style="animation-delay:.1s"><h3>🔮 Our prediction</h3>
+        <div class="stack" id="stack"></div><div class="legend" id="legend"></div>
+        <p class="para" id="predText"></p>
+        <div class="conf" id="conf"></div>
+        <div class="bottom" id="bottom"></div>
+      </div>
+      <div class="card full reveal" style="animation-delay:.15s"><h3>🧠 Why we think so — step by step</h3><ol class="why" id="why"></ol></div>
+      <div class="card reveal" style="animation-delay:.2s"><h3>🌍 Background to know</h3><p class="para" id="bg"></p></div>
+      <div class="card reveal" style="animation-delay:.25s"><h3>📚 Words explained</h3><div class="terms" id="terms"></div></div>
+    </div>
+
+    <div class="grid">
+      <div class="card reveal" style="animation-delay:.1s"><h3 id="hMeters">📊 Signal breakdown</h3><div id="meters"></div></div>
+      <div class="card reveal" style="animation-delay:.2s"><h3 id="hFlags">🚩 Red flags found</h3><ul class="list" id="flags"></ul></div>
+      <div class="card reveal" style="animation-delay:.3s"><h3 id="hGoods">✅ Trust signals</h3><ul class="list" id="goods"></ul></div>
+      <div class="card reveal" style="animation-delay:.4s"><h3 id="hClaims">🔎 Claims to verify</h3><ul class="list" id="claims"></ul></div>
+      <div class="card full reveal" style="animation-delay:.5s"><h3 id="hTips">🧭 What you should do</h3><ul class="list" id="tips"></ul></div>
+    </div>
+    <p class="note" id="rnote">AI gives an informed estimate, not a final ruling. It cannot browse live websites, so always confirm important news with trusted outlets and fact-check sites.</p>
+  </section>
+
+  <section class="history" id="histWrap" style="display:none">
+    <div class="card"><h3>🕘 Recent checks</h3><div id="hist"></div></div>
+  </section>
+
+  <footer>Built with HTML, CSS &amp; JavaScript + AI • TruthLens project</footer>
+</div>
+
+<script>
+(function(){
+  var $ = function(id){return document.getElementById(id)};
+  var CIRC = 540.4;
+  var SAMPLES = [
+    {t:"SHOCKING!!! Doctors HATE this one trick - government is HIDING the cure!! Share before they DELETE this. 100% guaranteed, anonymous insider reveals everything.", s:"WhatsApp forward"},
+    {t:"The central bank announced on Thursday that it kept its benchmark interest rate unchanged, citing stable inflation data released by the national statistics office. The governor said in a press conference that policy would remain data-dependent.", s:"reuters.com"},
+    {t:"BREAKING: Aliens confirmed to land in capital tomorrow, officials say it is a secret. Everyone must stay at home. Forward to 10 people for protection.", s:"Unknown social post"}
+  ];
+
+  /* ---------- date ---------- */
+  var d = new Date();
+  $("today").textContent = d.toLocaleDateString(undefined,{day:"numeric",month:"short",year:"numeric"});
+
+  /* ---------- theme ---------- */
+  try{var st=localStorage.getItem("tl-theme"); if(st) document.documentElement.setAttribute("data-theme",st);}catch(e){}
+  $("theme").onclick=function(){
+    var cur=document.documentElement.getAttribute("data-theme");
+    var dark = cur ? cur==="dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
+    var nx = dark ? "light":"dark";
+    document.documentElement.setAttribute("data-theme",nx);
+    try{localStorage.setItem("tl-theme",nx);}catch(e){}
+  };
+
+  /* ---------- sample chips ---------- */
+  var chips=$("chips");
+  ["Try: Viral forward","Try: Real-style report","Try: Hoax"].forEach(function(l,i){
+    var b=document.createElement("button");b.className="chip";b.textContent=l;
+    b.onclick=function(){$("txt").value=SAMPLES[i].t;$("src").value=SAMPLES[i].s;upd();};
+    chips.appendChild(b);
+  });
+  function upd(){$("count").textContent=$("txt").value.length+" / 6000";}
+  $("txt").addEventListener("input",upd);
+  $("clear").onclick=function(){$("txt").value="";$("src").value="";upd();$("result").classList.remove("on");$("err").classList.remove("on");};
+
+  /* ---------- helpers for beginner-friendly explanations ---------- */
+  var GLOSS={
+    clickbait:{word:"Clickbait",meaning:"Headlines or words designed to make you click or share, even when the story is weak or untrue."},
+    anon:{word:"Anonymous source",meaning:"A person whose name is hidden. Real reporters use them rarely and explain why. Hoaxes use them because nobody can check."},
+    fact:{word:"Fact-check",meaning:"Checking a claim against reliable evidence. Sites like AltNews, BOOM and PIB Fact Check do this for free."},
+    attr:{word:"Attribution",meaning:"Saying clearly who said something, or where the information came from."},
+    viral:{word:"Viral forward",meaning:"A message passed from person to person (for example on WhatsApp) until everyone has seen it, true or not."},
+    cred:{word:"Credibility score",meaning:"A number from 0 to 100 showing how trustworthy the content looks. Higher is better. It is an estimate, not a final verdict."},
+    meta:{word:"Metadata",meaning:"Hidden details stored inside a file, such as the camera model, the date or the editing tool used."},
+    deep:{word:"Deepfake",meaning:"A photo, video or voice made or changed by AI so it looks like someone did or said something they never did."},
+    rev:{word:"Reverse image search",meaning:"Uploading a picture to Google Lens or TinEye to see where else it appeared and to find the original."},
+    c2pa:{word:"Content Credentials (C2PA)",meaning:"A digital label that can show who created a file and whether AI or editing tools were used."}
+  };
+  var TOPICS=[
+    ["Health claim",/\b(cure|doctor|doctors|virus|vaccine|cancer|disease|hospital|medicine|health|covid|diabetes|immunity)\b/],
+    ["Money and finance",/\b(bank|rupee|rupees|price|prices|stock|market|tax|loan|rbi|interest rate|inflation|crypto|bitcoin|scheme|subsidy|salary)\b/],
+    ["Politics",/\b(government|minister|election|elections|party|vote|votes|president|parliament|policy|bjp|congress|chief minister|prime minister)\b/],
+    ["Disaster and safety",/\b(earthquake|flood|cyclone|storm|fire|attack|accident|alert|warning|tsunami|rain|outbreak)\b/],
+    ["Science and space",/\b(alien|aliens|nasa|isro|space|planet|moon|scientist|scientists|research|discovery)\b/],
+    ["Technology",/\b(app|phone|internet|hack|hacked|software|google|whatsapp|facebook|instagram|update|data leak)\b/],
+    ["Crime",/\b(police|arrest|arrested|murder|theft|crime|court|kidnap|scam)\b/],
+    ["Sports",/\b(cricket|match|ipl|football|tournament|player|olympics|world cup)\b/],
+    ["Entertainment",/\b(actor|actress|movie|film|celebrity|singer|bollywood|tollywood|box office)\b/]
+  ];
+  var TOPBG={
+    "Health claim":"Health hoaxes often promise a “secret cure” or say doctors are hiding something. Real medical advice comes from doctors, health ministries and the WHO, and it rarely uses words like “guaranteed”.",
+    "Politics":"Political rumours spread fastest around elections and big announcements. Real policy news is published by official offices and covered by several independent outlets at the same time.",
+    "Money and finance":"Money rumours (new schemes, bank rules, price changes) often copy the look of official notices. Real changes are announced on the official website of the bank, ministry or regulator.",
+    "Disaster and safety":"During emergencies, old photos and false warnings spread very quickly. Trust alerts only from official disaster-management and weather departments.",
+    "Science and space":"Big claims about space or science, such as aliens or miracle discoveries, are announced by scientists and agencies like NASA or ISRO and covered by many outlets, not just by forwards.",
+    "Technology":"Tech hoaxes often claim a new app update, a hack or a free offer. Check the company’s official website or app-store page before you believe or click anything.",
+    "Crime":"Crime rumours often mix a real event with made-up details or the wrong people. Wait for statements from the police and court records.",
+    "Sports":"Sports rumours (transfers, injuries, results) are often invented for clicks. Check the official accounts of the team or league.",
+    "Entertainment":"Celebrity gossip is often invented for clicks. Check the official social accounts of the person or the film’s production house.",
+    "General news":"Real events are usually reported by several independent outlets, with names, places and dates. Hoaxes usually live only in forwards and social posts."
+  };
+  function probsFromScore(score){
+    score=Math.max(0,Math.min(100,Number(score)||0));
+    var u=Math.round(40*(1-Math.abs(score-50)/50));
+    var rl=Math.round((100-u)*score/100);
+    return {real:rl,unv:u,fake:100-u-rl};
+  }
+  function normProbs(p,score){
+    if(!p||typeof p!=="object")return probsFromScore(score);
+    var a=Math.max(0,Number(p.real)),b=Math.max(0,Number(p.unverified!=null?p.unverified:p.uncertain)),c=Math.max(0,Number(p.fake!=null?p.fake:p.ai));
+    if(isNaN(a)||isNaN(b)||isNaN(c)||a+b+c<=0)return probsFromScore(score);
+    var t=a+b+c;a=Math.round(a/t*100);b=Math.round(b/t*100);c=100-a-b;
+    if(c<0){c=0;b=100-a;}
+    return {real:a,unv:b,fake:c};
+  }
+  function normConf(c){c=String(c||"").toLowerCase();return ["low","medium","high"].indexOf(c)>-1?c:"";}
+  function arrTerms(a){
+    if(!Array.isArray(a))return [];
+    return a.filter(function(x){return x&&typeof x.word==="string"&&typeof x.meaning==="string"&&x.word&&x.meaning;})
+            .map(function(x){return {word:x.word.slice(0,40),meaning:x.meaning.slice(0,260)};}).slice(0,5);
+  }
+  var EXTRA_KEYS=["topic","about","reasons","probs","predText","confidence","confWhy","background","terms","bottomLine"];
+  function fillMissing(res,base){
+    EXTRA_KEYS.forEach(function(k){
+      var v=res[k];
+      if(!v||(Array.isArray(v)&&!v.length))res[k]=base[k];
+    });
+  }
+
+  /* ---------- local heuristic engine (works with no AI) ---------- */
+  function heuristic(text, source){
+    var t=text.trim(), low=t.toLowerCase();
+    var words=t.split(/\s+/).filter(Boolean), n=words.length||1;
+    var flags=[], goods=[], score=62;
+    var caps=words.filter(function(w){return w.length>3 && w===w.toUpperCase() && /[A-Z]/.test(w)}).length;
+    var excl=(t.match(/!/g)||[]).length;
+    var clickbait=["shocking","you won't believe","hate this","doctors hate","miracle","secret","they don't want you","exposed","goes viral","must watch","unbelievable","jaw-dropping","banned"];
+    var cb=clickbait.filter(function(c){return low.indexOf(c)>-1});
+    var urgent=["forward","share before","share this","delete this","send to","before they","urgent","everyone must"];
+    var ur=urgent.filter(function(c){return low.indexOf(c)>-1});
+    var absolutes=["100%","guaranteed","always","never","everyone","nobody","proven","confirmed"];
+    var ab=absolutes.filter(function(c){return low.indexOf(c)>-1});
+    var vague=["anonymous","insider","sources say","some say","people are saying","experts say","leaked"];
+    var vg=vague.filter(function(c){return low.indexOf(c)>-1});
+    var attrib=/(said|told|announced|according to|stated|reported|press conference|statement|data from|published)/.test(low);
+    var hasNum=/\d/.test(t);
+    var hasDate=/(monday|tuesday|wednesday|thursday|friday|saturday|sunday|january|february|march|april|may|june|july|august|september|october|november|december|\d{4})/.test(low);
+    var trusted=/(reuters|apnews|associated press|bbc|thehindu|the hindu|pti|who\.int|gov\.in|nature\.com|nytimes|theguardian|indianexpress)/.test((source||"").toLowerCase());
+    var sketchy=/(whatsapp|forward|telegram|facebook post|unknown|viral|blogspot|anonymous)/.test((source||"").toLowerCase());
+
+    var sens = Math.min(100, caps*9 + excl*8 + cb.length*14);
+    var emo = Math.min(100, (excl*6) + ur.length*18 + (low.match(/(outrage|terrifying|disaster|horrible|evil|traitor|destroy|panic)/g)||[]).length*14);
+    var srcQ = 50;
+
+    if(caps>=3){score-=14;flags.push("Too many ALL-CAPS words ("+caps+") – a common sign of sensational writing.");}
+    if(excl>=2){score-=10;flags.push("Heavy use of exclamation marks ("+excl+").");}
+    if(cb.length){score-=12+cb.length*3;flags.push("Clickbait wording detected: “"+cb.slice(0,3).join("”, “")+"”.");}
+    if(ur.length){score-=14;flags.push("Pressure to share or act fast (“"+ur[0]+"”) – typical of viral hoaxes.");}
+    if(ab.length>=2){score-=8;flags.push("Absolute claims like “"+ab.slice(0,2).join("”, “")+"” with no evidence.");}
+    if(vg.length){score-=12;flags.push("Vague or unnamed sources (“"+vg[0]+"”).");}
+    if(n<12){score-=6;flags.push("Very short text – not enough detail to verify.");}
+    if(attrib){score+=10;goods.push("Statements are attributed to a person, body or publication.");srcQ+=15;}
+    if(hasNum&&hasDate){score+=8;goods.push("Contains specific dates or figures that can be checked.");}
+    if(n>=40&&caps<3&&excl<2){score+=6;goods.push("Calm, neutral tone with a reasonable amount of detail.");}
+    if(trusted){score+=14;goods.push("Source looks like an established news organisation.");srcQ=88;}
+    if(sketchy){score-=12;flags.push("Source is a forward / social post / unknown origin.");srcQ=18;}
+    if(!source){srcQ=40;}
+    if(!attrib&&!vg.length){srcQ=Math.min(srcQ,45);}
+    score=Math.max(3,Math.min(97,Math.round(score)));
+    if(!flags.length)flags.push("No obvious manipulation patterns found in the wording.");
+    if(!goods.length)goods.push("No strong trust signals were found in the text itself.");
+    var claims=[];
+    var sents=t.split(/(?<=[.!?])\s+/).filter(function(s){return s.length>25});
+    sents.slice(0,3).forEach(function(s){claims.push(s.length>140?s.slice(0,137)+"…":s);});
+    if(!claims.length)claims.push("Search the main claim on a fact-checking site.");
+    var verdict=score>=70?"genuine":score>=42?"uncertain":"fake";
+    var topic="General news";
+    for(var ti=0;ti<TOPICS.length;ti++){if(TOPICS[ti][1].test(low)){topic=TOPICS[ti][0];break;}}
+    var firstS=sents[0]||t; if(firstS.length>150)firstS=firstS.slice(0,147)+"…";
+    var toneS=(sens>50||emo>40)?"The writing tries hard to shock or scare you, which real reporters rarely do.":"The writing is fairly calm and factual in tone.";
+    var about="This looks like a “"+topic.toLowerCase()+"” message of about "+n+" words. In short, it says: “"+firstS+"” "+(source?"You told us it came from “"+source+"”. ":"You did not tell us where it came from. ")+toneS;
+    var why=[];
+    if(caps>=3)why.push("There are "+caps+" words in ALL CAPS. Why it matters: shouting makes you feel strongly before you think. Serious news is normally written calmly.");
+    if(excl>=2)why.push("There are "+excl+" exclamation marks. Why it matters: news reports rarely use them, while rumours and ads use them to grab attention.");
+    if(cb.length)why.push("Clickbait words such as “"+cb[0]+"” appear. Why it matters: they are meant to make you click or share, not to inform you.");
+    if(ur.length)why.push("The text pushes you to share or act fast (“"+ur[0]+"”). Why it matters: hoaxes need to spread quickly before anyone checks them.");
+    if(ab.length>=2)why.push("It uses absolute words like “"+ab[0]+"”. Why it matters: real facts usually come with limits and details, not “100% guaranteed”.");
+    if(vg.length)why.push("The source is vague (“"+vg[0]+"”). Why it matters: if nobody is named, nobody can be asked to prove it.");
+    if(sketchy)why.push("It came from a forward, social post or unknown origin. Why it matters: these have no editor or fact-checker, so mistakes and lies spread easily.");
+    if(attrib)why.push("It names who said or published something. Why it matters: when a person or office is named, the claim can be checked.");
+    if(hasNum&&hasDate)why.push("It includes dates and numbers. Why it matters: specific details can be verified, which makes inventing a story harder.");
+    if(trusted)why.push("The source looks like an established news organisation. Why it matters: such outlets have editors and correct their mistakes.");
+    if(n<12)why.push("The text is very short. Why it matters: with so little detail there is nothing to check, so we stay careful.");
+    if(!why.length)why.push("We found no strong clues either way in the wording, so the result stays cautious.");
+    var terms=[];
+    if(cb.length)terms.push(GLOSS.clickbait);
+    if(vg.length)terms.push(GLOSS.anon);
+    if(ur.length||sketchy)terms.push(GLOSS.viral);
+    if(attrib)terms.push(GLOSS.attr);
+    terms.push(GLOSS.cred);terms.push(GLOSS.fact);
+    var strong=(trusted||flags.length>=3||goods.length>=3);
+    return {
+      verdict:verdict, score:score, probs:probsFromScore(score), topic:topic, about:about, reasons:why.slice(0,5),
+      predText: verdict==="genuine"?"Most likely this is a real, ordinary news report. Even so, “looks genuine” is not the same as “proven”, so confirm the main fact with one more trusted outlet.":verdict==="uncertain"?"It could be true, exaggerated or only half true. There is too little proof in the text to decide, so treat it as unconfirmed.":"Most likely this is a hoax, a scam message or a heavily exaggerated rumour, written to be shared quickly rather than to inform.",
+      confidence: (n<12||!strong)?"low":"medium",
+      confWhy:"This check reads only the wording and the source you gave. It cannot look up today’s news, so confidence stays limited.",
+      background: TOPBG[topic]+" This check works only from the words you pasted, so it cannot confirm whether the event really happened. Search the main claim on Google News and a fact-check site to be sure.",
+      terms:terms.slice(0,4),
+      bottomLine: verdict==="genuine"?"Looks normal, but still double-check before you share it.":verdict==="uncertain"?"Do not believe it or share it until a trusted source confirms it.":"Do not forward this. It shows many warning signs of a hoax.",
+      title: verdict==="genuine"?"Looks likely genuine":verdict==="uncertain"?"Be careful – unverified":"Likely fake or misleading",
+      summary: verdict==="genuine"?"The writing is measured and attributed. Still, confirm the facts with a second trusted source.":verdict==="uncertain"?"Some signals are mixed. Treat it as unconfirmed until a reliable outlet reports the same thing.":"This text uses several manipulation tricks common in misinformation and gives little checkable evidence.",
+      sensationalism:sens, emotional:emo, sourceQuality:srcQ, evidence:Math.min(100,(attrib?45:10)+(hasNum?20:0)+(hasDate?20:0)+(trusted?15:0)),
+      redFlags:flags, trustSignals:goods, claimsToVerify:claims,
+      tips:["Search the headline on Google News or a fact-check site (AltNews, BOOM, PIB Fact Check, Snopes).","Check who published it and when – old stories often return as ‘new’.","Don’t forward until you have verified it with at least two reliable sources."],
+      engine:"Offline rule-based engine"
+    };
+  }
+
+  /* ---------- AI analysis ---------- */
+  var PROMPT = function(text, source){
+    return "You are a careful fact-checking and media-literacy analyst. Today's date is "+d.toDateString()+".\n"+
+    "Analyze the news text below for likelihood of being fake/misleading. Judge writing style, sensationalism, emotional manipulation, source credibility, internal consistency, plausibility, and whether claims match what you know about the world. "+
+    "You cannot browse the internet and your knowledge may be older than today, so if a claim is about very recent events you cannot confirm, say it is unverified rather than calling it fake, and lower confidence accordingly.\n"+
+    "Return ONLY valid JSON (no markdown, no prose) with exactly these keys:\n"+
+    '{"verdict":"genuine|uncertain|fake","score":0-100 (credibility; 100 = very credible),"title":"short headline verdict (max 6 words)","summary":"2 sentences, simple English","sensationalism":0-100,"emotional":0-100,"sourceQuality":0-100,"evidence":0-100,"redFlags":["max 5 short strings"],"trustSignals":["max 4 short strings"],"claimsToVerify":["max 4 specific claims taken from the text"],"tips":["max 4 practical next steps for the reader, including what to search or which type of source to check"],"topic":"2-4 word category, e.g. Health claim, Politics, Money and finance, Disaster and safety, Technology","about":"3-4 short sentences explaining in very simple words what this text is claiming or reporting: who, what, when and where, as if talking to a beginner with no background","reasons":["3-5 step-by-step reasons for the verdict. Each one starts with a real clue taken from the text and then explains in simple words why that clue matters"],"prediction":{"real":0-100,"unverified":0-100,"fake":0-100 (three whole numbers that add up to 100)},"predictionText":"2 sentences: what is most likely the real truth behind this text, and why it was probably written or shared","confidence":"low|medium|high","confidenceWhy":"one short sentence","background":"3-4 simple sentences of useful background about the topic: what is generally known, common myths, and how claims like this usually work. Say clearly if things may have changed recently","terms":[{"word":"a hard word you used or a key idea","meaning":"very simple meaning"}],"bottomLine":"one plain sentence a beginner can remember"}\n'+
+    "Write every text field for a complete beginner: short sentences, everyday words, no jargon, and explain any technical word you must use. Never invent facts or quotes. If you are unsure, say so honestly. Use at most 4 items in terms.\n"+
+    "Source/website given by the user: "+(source||"not provided")+"\n"+
+    "NEWS TEXT:\n\"\"\"\n"+text+"\n\"\"\"";
+  };
+
+  /* ---------- connect to our own backend ---------- */
+  var API = location.protocol==="file:" ? "http://localhost:5000" : "";
+  var samplePromise = null;
+  function blobToB64(b){return new Promise(function(res,rej){var r=new FileReader();r.onload=function(){res(String(r.result).split(",")[1])};r.onerror=rej;r.readAsDataURL(b);});}
+  function getSample(){
+    if(!samplePromise){
+      samplePromise = fetch(API+"/api/health").then(function(r){return r.ok?r.json():null;}).then(function(h){
+        if(!h||!h.aiReady)return null;
+        return {
+          limits:async function(){return {images:{maxCount:4}};},
+          json:async function(prompt,opts){
+            var imgs=[];
+            if(opts&&opts.images){for(var i=0;i<opts.images.length;i++)imgs.push(await blobToB64(opts.images[i]));}
+            var r=await fetch(API+"/api/analyze",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt:prompt,images:imgs})});
+            var data=await r.json();
+            if(!r.ok)throw new Error(data.error||"Server error");
+            return data.result;
+          }
+        };
+      }).catch(function(){return null;}).then(function(x){if(!x)samplePromise=null;return x;});
+    }
+    return samplePromise;
+  }
+
+  function clamp(x){x=Number(x);if(isNaN(x))return 50;return Math.max(0,Math.min(100,Math.round(x)));}
+  function arr(a){return Array.isArray(a)?a.filter(function(x){return typeof x==="string"&&x}).slice(0,6):[];}
+
+  async function analyzeAI(text, source){
+    var sample = await getSample();
+    if(!sample) return null;
+    var r = await sample.json(PROMPT(text,source),{cache:false});
+    var v = (r && typeof r==="object") ? r : null;
+    if(!v) return null;
+    var verdict = ["genuine","uncertain","fake"].indexOf(v.verdict)>-1 ? v.verdict : (clamp(v.score)>=70?"genuine":clamp(v.score)>=42?"uncertain":"fake");
+    return {
+      verdict:verdict, score:clamp(v.score), title:String(v.title||"Analysis complete").slice(0,60),
+      summary:String(v.summary||"").slice(0,400),
+      sensationalism:clamp(v.sensationalism), emotional:clamp(v.emotional), sourceQuality:clamp(v.sourceQuality), evidence:clamp(v.evidence),
+      redFlags:arr(v.redFlags), trustSignals:arr(v.trustSignals), claimsToVerify:arr(v.claimsToVerify), tips:arr(v.tips),
+      topic:String(v.topic||"").slice(0,40), about:String(v.about||"").slice(0,800), reasons:arr(v.reasons),
+      probs:normProbs(v.prediction,clamp(v.score)), predText:String(v.predictionText||"").slice(0,600),
+      confidence:normConf(v.confidence), confWhy:String(v.confidenceWhy||"").slice(0,240),
+      background:String(v.background||"").slice(0,800), terms:arrTerms(v.terms), bottomLine:String(v.bottomLine||"").slice(0,220),
+      engine:"Gemini AI analysis"
+    };
+  }
+
+  /* ---------- UI helpers ---------- */
+  function colorFor(v){return v==="genuine"?"var(--good)":v==="uncertain"?"var(--warn)":"var(--bad)";}
+  function fillList(id, items, icon){
+    var ul=$(id); ul.innerHTML="";
+    if(!items.length){items=["Nothing specific found."];}
+    items.forEach(function(s,i){
+      var li=document.createElement("li");li.style.animationDelay=(0.15*i+0.3)+"s";
+      var ic=document.createElement("i");ic.textContent=icon;
+      var sp=document.createElement("span");sp.textContent=s;
+      li.appendChild(ic);li.appendChild(sp);ul.appendChild(li);
+    });
+  }
+  function meter(label,val,bad){
+    var wrap=document.createElement("div");wrap.className="meter";
+    var top=document.createElement("div");top.className="top";
+    var a=document.createElement("span");a.textContent=label;
+    var b=document.createElement("span");b.textContent=val+"%";
+    top.appendChild(a);top.appendChild(b);
+    var bar=document.createElement("div");bar.className="mbar";
+    var f=document.createElement("div");f.className="mfill";
+    var c = bad ? (val>66?"var(--bad)":val>33?"var(--warn)":"var(--good)") : (val>66?"var(--good)":val>33?"var(--warn)":"var(--bad)");
+    f.style.background=c;
+    bar.appendChild(f);wrap.appendChild(top);wrap.appendChild(bar);
+    setTimeout(function(){f.style.width=val+"%";},120);
+    return wrap;
+  }
+  function animateNumber(el,to){
+    var start=performance.now(),dur=1600;
+    function tick(now){
+      var p=Math.min(1,(now-start)/dur),e=1-Math.pow(1-p,3);
+      el.textContent=Math.round(to*e);
+      if(p<1)requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  }
+
+  function render(r){
+    var media=r.mode==="media";
+    var col=colorFor(r.verdict);
+    var bar=$("bar");
+    bar.style.strokeDashoffset=CIRC; bar.style.stroke=col;
+    $("result").classList.add("on");
+    $("score").textContent="0";
+    requestAnimationFrame(function(){requestAnimationFrame(function(){
+      bar.style.strokeDashoffset=CIRC*(1-r.score/100);
+    });});
+    animateNumber($("score"),r.score);
+    var badge=$("badge");
+    badge.className="badge "+(r.verdict==="genuine"?"good":r.verdict==="uncertain"?"warn":"bad");
+    if(media){
+      badge.textContent=r.verdict==="genuine"?"📷 LIKELY REAL":r.verdict==="uncertain"?"⚠ UNCERTAIN":"🤖 LIKELY AI-GENERATED";
+    }else{
+      badge.textContent=r.verdict==="genuine"?"✔ LIKELY GENUINE":r.verdict==="uncertain"?"⚠ UNVERIFIED":"✖ LIKELY FAKE";
+    }
+    $("glabel").textContent=media?"authenticity":"credibility";
+    $("hMeters").textContent=media?"📊 Detection signals":"📊 Signal breakdown";
+    $("hFlags").textContent=media?"🤖 Signs of AI generation":"🚩 Red flags found";
+    $("hGoods").textContent=media?"📷 Signs of a real capture":"✅ Trust signals";
+    $("hClaims").textContent=media?"👁 What was examined":"🔎 Claims to verify";
+    $("rnote").textContent=media
+      ?"No AI detector is 100% reliable. Modern generators can fool both people and tools, and real photos can look suspicious after compression or editing. Treat this as a clue, then check the original source (reverse image search, Content Credentials / C2PA)."
+      :"AI gives an informed estimate, not a final ruling. It cannot browse live websites, so always confirm important news with trusted outlets and fact-check sites.";
+    $("vtitle").textContent=r.title;
+    $("vsum").textContent=r.summary;
+    $("engine").textContent="Engine: "+r.engine;
+    var m=$("meters");m.innerHTML="";
+    if(r.meters){
+      r.meters.forEach(function(x){m.appendChild(meter(x.label,x.val,x.bad));});
+    }else{
+      m.appendChild(meter("Sensational language",r.sensationalism,true));
+      m.appendChild(meter("Emotional manipulation",r.emotional,true));
+      m.appendChild(meter("Source quality",r.sourceQuality,false));
+      m.appendChild(meter("Checkable evidence",r.evidence,false));
+    }
+    fillList("flags",r.redFlags,media?"🤖":"🚩");
+    fillList("goods",r.trustSignals,media?"📷":"✅");
+    fillList("claims",r.claimsToVerify,media?"👁":"🔎");
+    fillList("tips",r.tips,"👉");
+    renderExplain(r,media);
+    setTimeout(function(){$("result").scrollIntoView({behavior:"smooth",block:"start"});},150);
+  }
+  function fillOl(id,items){
+    var ol=$(id);ol.innerHTML="";
+    if(!items||!items.length)items=["No step-by-step reasons were available."];
+    items.forEach(function(s,i){
+      var li=document.createElement("li");li.style.animationDelay=(0.12*i+0.2)+"s";
+      var sp=document.createElement("span");sp.textContent=s;li.appendChild(sp);ol.appendChild(li);
+    });
+  }
+  function renderExplain(r,media){
+    $("hAbout").textContent=media?"📖 What this file shows — in simple words":"📖 What this news is about — in simple words";
+    $("topic").textContent=r.topic||(media?"Image / video":"News text");
+    $("about").textContent=r.about||"No description was available for this input.";
+    var p=r.probs||probsFromScore(r.score);
+    var names=media?["Real","Not sure","AI-made"]:["Genuine","Unverified","Fake / misleading"];
+    var vals=[p.real,p.unv,p.fake],cols=["var(--good)","var(--warn)","var(--bad)"];
+    var st=$("stack"),lg=$("legend");st.innerHTML="";lg.innerHTML="";
+    vals.forEach(function(v,i){
+      var sg=document.createElement("div");sg.className="seg";sg.style.background=cols[i];sg.title=names[i]+" "+v+"%";st.appendChild(sg);
+      setTimeout(function(){sg.style.width=v+"%";},150);
+      var sp=document.createElement("span"),dt=document.createElement("i");dt.style.background=cols[i];
+      sp.appendChild(dt);sp.appendChild(document.createTextNode(names[i]+": "+v+"%"));lg.appendChild(sp);
+    });
+    $("predText").textContent=r.predText||"";
+    var cf=normConf(r.confidence)||"low";
+    var cb=$("conf");cb.innerHTML="";
+    var b=document.createElement("b");b.textContent="Confidence: "+cf.charAt(0).toUpperCase()+cf.slice(1);
+    cb.appendChild(b);cb.appendChild(document.createTextNode(r.confWhy?" — "+r.confWhy:""));
+    $("bottom").textContent="💡 "+(r.bottomLine||r.title||"");
+    fillOl("why",r.reasons);
+    $("bg").textContent=r.background||"";
+    var tm=$("terms");tm.innerHTML="";
+    (r.terms&&r.terms.length?r.terms:[GLOSS.fact,GLOSS.cred]).forEach(function(t){
+      var d=document.createElement("div");d.className="term";
+      var w=document.createElement("b");w.textContent=t.word;
+      d.appendChild(w);d.appendChild(document.createTextNode(" — "+t.meaning));tm.appendChild(d);
+    });
+  }
+
+  /* ---------- history ---------- */
+  function loadHist(){try{return JSON.parse(localStorage.getItem("tl-hist")||"[]")}catch(e){return[]}}
+  function saveHist(item){
+    var h=loadHist();h.unshift(item);h=h.slice(0,6);
+    try{localStorage.setItem("tl-hist",JSON.stringify(h));}catch(e){}
+    drawHist();
+  }
+  function drawHist(){
+    var h=loadHist(),box=$("hist");box.innerHTML="";
+    $("histWrap").style.display=h.length?"block":"none";
+    h.forEach(function(it){
+      var row=document.createElement("div");row.className="hitem";
+      var s=document.createElement("span");s.className="s";s.textContent=it.score+"%";s.style.color=colorFor(it.verdict);
+      var t=document.createElement("span");t.className="t";t.textContent=it.text;
+      row.appendChild(s);row.appendChild(t);
+      row.onclick=function(){$("txt").value=it.full||it.text;$("src").value=it.source||"";upd();window.scrollTo({top:0,behavior:"smooth"});};
+      box.appendChild(row);
+    });
+  }
+  drawHist();
+
+  /* ---------- main flow ---------- */
+  var busy=false;
+  var STEPS=["Reading the article…","Scanning language and tone…","Looking for manipulation tricks…","Checking claims and sources…","Calculating credibility score…"];
+  $("go").onclick=async function(){
+    if(busy)return;
+    var text=$("txt").value.trim(), source=$("src").value.trim();
+    var err=$("err");err.classList.remove("on");
+    if(text.length<15){err.textContent="Please paste a headline or article (at least a sentence).";err.classList.add("on");return;}
+    busy=true;$("go").disabled=true;$("go").textContent="Analyzing…";
+    $("result").classList.remove("on");
+    $("scan").classList.add("on");
+    var si=0;$("steps").textContent=STEPS[0];
+    var iv=setInterval(function(){si=(si+1)%STEPS.length;$("steps").textContent=STEPS[si];},1400);
+    var minWait=new Promise(function(r){setTimeout(r,2200)});
+    var result=null,aiFailed=false;
+    try{ result=await analyzeAI(text,source); }
+    catch(e){ aiFailed=true; }
+    await minWait;
+    var usedFallback=false;
+    var offline=heuristic(text,source);
+    if(!result){ result=offline; usedFallback=true; }
+    else fillMissing(result,offline);
+    clearInterval(iv);
+    $("scan").classList.remove("on");
+    render(result);
+    if(usedFallback && aiFailed){
+      err.textContent="AI service was unavailable, so the offline rule-based engine was used instead.";err.classList.add("on");
+    }
+    saveHist({score:result.score,verdict:result.verdict,text:text.slice(0,90),full:text,source:source});
+    busy=false;$("go").disabled=false;$("go").textContent="🔍 Analyze News";
+  };
+
+  /* =====================================================
+     IMAGE / VIDEO – AI-generated detection
+     ===================================================== */
+  function showErr(m){var e=$("err");e.textContent=m;e.classList.add("on");}
+  function setTab(t){
+    var m=t==="media";
+    $("panelText").style.display=m?"none":"block";
+    $("panelMedia").style.display=m?"block":"none";
+    $("tabT").classList.toggle("on",!m);$("tabM").classList.toggle("on",m);
+    $("result").classList.remove("on");$("err").classList.remove("on");
+  }
+  $("tabT").onclick=function(){setTab("text")};
+  $("tabM").onclick=function(){setTab("media")};
+
+  var curFile=null,curKind=null,curURL=null;
+  function clearMedia(){
+    if(curURL)URL.revokeObjectURL(curURL);
+    curFile=null;curKind=null;curURL=null;
+    $("pbox").innerHTML="";$("preview").style.display="none";
+    $("drop").classList.remove("has");$("file").value="";
+    $("dropT").textContent="Tap to upload, or drop an image / video here";
+    $("result").classList.remove("on");$("err").classList.remove("on");
+  }
+  function setFile(f){
+    $("err").classList.remove("on");
+    if(!f)return;
+    var isImg=/^image\//.test(f.type),isVid=/^video\//.test(f.type);
+    if(!isImg&&!isVid){showErr("Please choose an image or a video file.");return;}
+    if(isImg&&f.size>20*1024*1024){showErr("This image is too large (max 20 MB).");return;}
+    if(isVid&&f.size>100*1024*1024){showErr("This video is too large (max 100 MB).");return;}
+    if(curURL)URL.revokeObjectURL(curURL);
+    curFile=f;curKind=isImg?"image":"video";curURL=URL.createObjectURL(f);
+    var box=$("pbox");box.innerHTML="";
+    var el=document.createElement(isImg?"img":"video");
+    el.src=curURL;
+    if(!isImg){el.controls=true;el.muted=true;el.playsInline=true;el.preload="metadata";}
+    box.appendChild(el);
+    $("pinfo").textContent=f.name+" • "+(f.size/1048576).toFixed(2)+" MB • "+(isImg?"Image":"Video");
+    $("preview").style.display="flex";
+    $("drop").classList.add("has");
+    $("dropT").textContent="Tap to choose a different file";
+    $("result").classList.remove("on");
+  }
+  var drop=$("drop"),fileIn=$("file");
+  fileIn.onchange=function(){setFile(fileIn.files&&fileIn.files[0])};
+  ["dragenter","dragover"].forEach(function(ev){drop.addEventListener(ev,function(e){e.preventDefault();drop.classList.add("over");});});
+  ["dragleave","drop"].forEach(function(ev){drop.addEventListener(ev,function(e){e.preventDefault();drop.classList.remove("over");});});
+  drop.addEventListener("drop",function(e){setFile(e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0]);});
+  $("clearM").onclick=clearMedia;
+
+  function loadImg(url){return new Promise(function(res,rej){var im=new Image();im.onload=function(){res(im)};im.onerror=function(){rej(new Error("img"))};im.src=url;});}
+  function toCanvas(src,w,h,maxSide){
+    var sc=Math.min(1,maxSide/Math.max(w,h));
+    var cw=Math.max(1,Math.round(w*sc)),ch=Math.max(1,Math.round(h*sc));
+    var c=document.createElement("canvas");c.width=cw;c.height=ch;
+    c.getContext("2d").drawImage(src,0,0,cw,ch);
+    return c;
+  }
+  function canvasBlob(c){return new Promise(function(res){c.toBlob(function(b){res(b)},"image/jpeg",0.92);});}
+  /* sensor-noise estimate from a native-resolution centre crop */
+  function noiseOf(src,w,h){
+    var cw=Math.min(512,w),ch=Math.min(512,h);
+    var c=document.createElement("canvas");c.width=cw;c.height=ch;
+    var ctx=c.getContext("2d",{willReadFrequently:true});
+    ctx.drawImage(src,Math.floor((w-cw)/2),Math.floor((h-ch)/2),cw,ch,0,0,cw,ch);
+    var d=ctx.getImageData(0,0,cw,ch).data,g=new Float32Array(cw*ch),i,j;
+    for(i=0,j=0;i<d.length;i+=4,j++)g[j]=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2];
+    var sum=0,cnt=0,x,y,k,mm;
+    for(y=1;y<ch-1;y+=2){for(x=1;x<cw-1;x+=2){
+      k=y*cw+x;mm=(g[k-1]+g[k+1]+g[k-cw]+g[k+cw])/4;
+      sum+=Math.abs(g[k]-mm);cnt++;
+    }}
+    return cnt?sum/cnt:0;
+  }
+  async function getVideoFrames(url){
+    var v=document.createElement("video");v.muted=true;v.playsInline=true;v.preload="auto";v.src=url;
+    await new Promise(function(res,rej){
+      v.onloadeddata=res;v.onerror=function(){rej(new Error("video"))};
+      setTimeout(function(){rej(new Error("timeout"))},12000);
+    });
+    var dur=isFinite(v.duration)&&v.duration>0?v.duration:1;
+    var pts=[0.08,0.35,0.62,0.9].map(function(p){return Math.min(Math.max(dur-0.05,0),dur*p)});
+    var out={frames:[],noises:[],duration:dur,w:v.videoWidth,h:v.videoHeight};
+    for(var i=0;i<pts.length;i++){
+      await new Promise(function(res){
+        var done=false;
+        function fin(){if(done)return;done=true;v.onseeked=null;res();}
+        v.onseeked=fin;v.currentTime=pts[i];setTimeout(fin,4000);
+      });
+      if(!v.videoWidth)continue;
+      out.frames.push(toCanvas(v,v.videoWidth,v.videoHeight,1024));
+      out.noises.push(noiseOf(v,v.videoWidth,v.videoHeight));
+    }
+    return out;
+  }
+  async function scanMeta(file){
+    var size=file.size,chunk=Math.min(size,524288);
+    var bufs=[await file.slice(0,chunk).arrayBuffer()];
+    if(size>chunk*2)bufs.push(await file.slice(size-chunk).arrayBuffer());
+    var s="";
+    bufs.forEach(function(b){
+      var u=new Uint8Array(b),parts=[];
+      for(var i=0;i<u.length;i+=8192)parts.push(String.fromCharCode.apply(null,u.subarray(i,i+8192)));
+      s+=parts.join("");
+    });
+    return s.toLowerCase();
+  }
+  var AI_TAGS=["stable diffusion","midjourney","dall-e","dall·e","openai","chatgpt","adobe firefly","firefly","comfyui","automatic1111","novelai","leonardo.ai","dreamstudio","trainedalgorithmicmedia","invokeai","runwayml","klingai","kling ai","lumalabs","synthesia","heygen","google veo","made with google ai","imagen","bing image creator","ideogram","sampler:","cfg scale"];
+  var CAM_TAGS=["canon","nikon","apple","samsung","google","xiaomi","huawei","oneplus","fujifilm","panasonic","olympus","gopro","hasselblad","leica"];
+  var VCAM_TAGS=["com.apple.quicktime","samsung","android","gopro","xiaomi","huawei"];
+  var NAME_AI=/(midjourney|dall[-_ ]?e|firefly|stable[-_ ]?diffusion|sdxl|generated|ai[-_ ]?(image|art|video|generated)|gemini_generated|chatgpt|sora|runway|kling|veo|pika|leonardo|ideogram|flux)/i;
+  var NAME_CAM=/^(IMG|DSC|DSCN|PXL|MVIMG|VID|MOV|P)[_-]?\d{3,}/i;
+
+  async function localMedia(file,kind,w,h,dur,noises){
+    var meta="";try{meta=await scanMeta(file);}catch(e){}
+    var ai=[],real=[],obs=[],score=50;
+    var aiTag=null;
+    for(var i=0;i<AI_TAGS.length;i++){if(meta.indexOf(AI_TAGS[i])>-1){aiTag=AI_TAGS[i];break;}}
+    var exif=kind==="image"&&meta.indexOf("exif\u0000\u0000")>-1;
+    var cam=null,list=kind==="image"?CAM_TAGS:VCAM_TAGS;
+    if(kind==="video"||exif){for(var j=0;j<list.length;j++){if(meta.indexOf(list[j])>-1){cam=list[j];break;}}}
+    var c2pa=meta.indexOf("c2pa")>-1||meta.indexOf("jumbf")>-1;
+    var metaScore=30,traces=5;
+
+    if(aiTag){score-=45;metaScore=5;traces=95;ai.push("Hidden file data mentions an AI tool or label (“"+aiTag+"”).");}
+    if(NAME_AI.test(file.name)){score-=20;traces=Math.max(traces,60);ai.push("The file name looks like it came from an AI tool.");}
+    if(NAME_CAM.test(file.name)){score+=5;real.push("File name follows a normal phone/camera pattern.");}
+    if(cam){score+=20;metaScore=Math.max(metaScore,90);real.push("Camera data found in the file (looks like “"+cam+"”).");}
+    else if(exif){score+=8;metaScore=Math.max(metaScore,62);real.push("Has EXIF camera-style metadata.");}
+    if(c2pa){metaScore=Math.max(metaScore,55);obs.push("Content Credentials (C2PA) data is present. Check who signed it.");}
+    if(!aiTag&&!cam&&!exif&&!c2pa){obs.push("No metadata found. Social apps remove it, so this proves nothing either way.");}
+
+    if(w&&h){
+      obs.push("Size: "+w+" × "+h+(dur?" • "+dur.toFixed(1)+" s":"")+".");
+      if(w%64===0&&h%64===0&&Math.min(w,h)>=512){score-=8;traces=Math.max(traces,30);ai.push("Resolution ("+w+"×"+h+") is a typical AI-generator size.");}
+    }
+    var nz=null;
+    if(noises&&noises.length){
+      nz=noises.reduce(function(a,b){return a+b},0)/noises.length;
+      obs.push("Fine-grain noise level: "+nz.toFixed(2)+(nz<1.2?" (very smooth)":nz>3.5?" (natural grain)":" (normal)")+".");
+      if(nz<1.2){score-=10;ai.push("Unusually smooth texture with almost no natural sensor grain.");}
+      else if(nz>3.5){score+=8;real.push("Natural camera-like grain across the picture.");}
+    }
+    score=Math.max(10,Math.min(90,Math.round(score)));
+    var verdict=aiTag?"fake":score>=65?"genuine":score<=35?"fake":"uncertain";
+    var meters=[
+      {label:"AI-tool traces",val:traces,bad:true},
+      {label:"Metadata & origin",val:metaScore,bad:false}
+    ];
+    if(nz!==null)meters.push({label:"Natural texture / grain",val:Math.min(100,Math.round(nz/4.5*100)),bad:false});
+    var aiRaw=ai.slice(),realRaw=real.slice();
+    if(!ai.length)ai.push("No obvious AI-tool traces in the file itself.");
+    if(!real.length)real.push("No strong proof of a real camera capture was found in the file.");
+    return {score:score,verdict:verdict,meters:meters,redFlags:ai,trustSignals:real,claimsToVerify:obs,aiTag:aiTag,cam:cam,exif:exif,aiRaw:aiRaw,realRaw:realRaw};
+  }
+
+  function mediaExtras(loc,file,kind,w,h,dur){
+    var fake=loc.verdict==="fake",real=loc.verdict==="genuine";
+    var reasons=[];
+    loc.aiRaw.forEach(function(x){reasons.push("Points towards AI: "+x);});
+    loc.realRaw.forEach(function(x){reasons.push("Points towards a real capture: "+x);});
+    if(!reasons.length)reasons.push("The file carries no clear clues either way, so this basic check cannot decide. That is common after a picture is shared through a chat or social app.");
+    return {
+      topic:kind==="video"?"Video file":"Image file",
+      about:"You uploaded a "+kind+" called “"+file.name+"” ("+(file.size/1048576).toFixed(2)+" MB"+(w&&h?", "+w+" × "+h+" pixels":"")+(dur?", "+dur.toFixed(1)+" seconds":"")+"). This basic mode cannot see what is happening inside the "+kind+", so it only reads the hidden file details, the size and the grain. AI vision gives a plain description of the scene.",
+      reasons:reasons.slice(0,5),
+      probs:probsFromScore(loc.score),
+      predText:fake?"The file details point towards an AI tool. Treat it as likely AI-made until you can find the original source.":real?"The file details look like a normal camera capture. That is a good sign, but it is not proof, because details can be copied or edited.":"The file alone does not give enough clues. It could be real or AI-made, so the original source matters more than this check.",
+      confidence:(loc.aiTag||loc.cam)?"medium":"low",
+      confWhy:loc.aiTag?"An AI label inside the file is a strong clue.":loc.cam?"Camera details in the file are a good sign, but they can be copied.":"File checks cannot look at the picture itself, so confidence stays low.",
+      background:"AI tools such as Midjourney, DALL·E, Stable Diffusion, Sora and Veo can make pictures and videos that look completely real. Real photos usually carry camera details and natural grain, but apps like WhatsApp and Instagram remove that data, so a missing tag proves nothing. The surest method is to find the original source with a reverse image search or by checking Content Credentials.",
+      terms:[GLOSS.meta,GLOSS.deep,GLOSS.rev,GLOSS.c2pa],
+      bottomLine:fake?"Treat this as likely AI-made until you find the original source.":real?"Looks like a normal capture, but confirm where it first appeared.":"Not enough evidence from the file. Find the original source before you trust or share it."
+    };
+  }
+
+  var MPROMPT=function(kind,n){
+    return "You are a careful digital-forensics assistant. Today's date is "+d.toDateString()+".\n"+
+    (kind==="video"
+      ?"The "+n+" attached images are frames sampled in time order from ONE video. "
+      :"The attached image is the one to analyze. ")+
+    "Decide whether the content is most likely AI-generated (diffusion / GAN / AI video / deepfake or face-swap) or a real camera capture.\n"+
+    "Look closely at: hands, fingers and teeth; eyes and reflections; skin and hair texture; text, logos and signs; jewellery and clothing details; background coherence and repeated patterns; lighting, shadows and reflections; perspective and physics; over-smooth or 'plastic' look; unnatural bokeh; "+
+    (kind==="video"?"and consistency of faces, objects, clothing and backgrounds BETWEEN frames. ":"and signs of editing or compositing. ")+
+    "Write every text field for a complete beginner: short sentences, everyday words, no jargon, and explain any technical word you must use. Use at most 4 items in terms.\n"+
+    "Be calibrated: modern generators can look flawless, and real photos may look odd due to compression, filters or editing. Avoid scores above 92 or below 8 unless the evidence is overwhelming. If the media is low resolution or heavily compressed, say it limits confidence. Do not identify any real person.\n"+
+    "Return ONLY valid JSON with exactly these keys:\n"+
+    '{"verdict":"ai|uncertain|real","score":0-100 (authenticity: 100 = very likely a real camera capture, 0 = very likely AI-generated),"title":"max 6 words","summary":"2 simple sentences","artifacts":0-100 (amount of visible AI-style artifacts),"texture":0-100 (how natural textures look),"lighting":0-100 (lighting, shadow and physics consistency),"context":0-100 (scene plausibility and consistency),"aiSigns":["max 5 specific visual clues pointing to AI"],"realSigns":["max 4 clues pointing to a real capture"],"observations":["max 4 neutral things you examined"],"tips":["max 4 practical next steps, e.g. reverse image search, find the original source, check Content Credentials"],"topic":"2-4 word label for what it shows, e.g. Street scene, Portrait photo, Screenshot, News event video","about":"3-4 short simple sentences describing what is visible: the scene, objects, setting, any readable text and the mood. Do not name or identify any real person","reasons":["3-5 step-by-step reasons for the verdict. Each one names a specific visible clue and explains in simple words why it matters"],"prediction":{"real":0-100,"unverified":0-100,"ai":0-100 (three whole numbers that add up to 100)},"predictionText":"2 sentences: what this most likely is and what a viewer should keep in mind","confidence":"low|medium|high","confidenceWhy":"one short sentence, mention image quality if it limits confidence","background":"3-4 simple sentences: how AI fakes of this kind are usually made, what real ones look like, and what to check next","terms":[{"word":"a key idea or technical word","meaning":"very simple meaning"}],"bottomLine":"one plain sentence a beginner can remember"}';
+  };
+
+  async function analyzeMediaAI(kind,canvases){
+    var sample=await getSample();
+    if(!sample)return null;
+    var caps=null;
+    try{caps=await sample.limits();}catch(e){}
+    if(!caps||!caps.images||!canvases.length)return null;
+    var cs=canvases.slice(0,Math.max(1,caps.images.maxCount||1));
+    var blobs=[];
+    for(var i=0;i<cs.length;i++){var b=await canvasBlob(cs[i]);if(b)blobs.push(b);}
+    if(!blobs.length)return null;
+    var v=await sample.json(MPROMPT(kind,blobs.length),{images:blobs,cache:false});
+    if(!v||typeof v!=="object")return null;
+    var verdict=v.verdict==="ai"?"fake":v.verdict==="real"?"genuine":v.verdict==="uncertain"?"uncertain":(clamp(v.score)>=65?"genuine":clamp(v.score)<=35?"fake":"uncertain");
+    return {
+      verdict:verdict,score:clamp(v.score),title:String(v.title||"Analysis complete").slice(0,60),summary:String(v.summary||"").slice(0,400),
+      aiMeters:[
+        {label:"Visual AI artifacts",val:clamp(v.artifacts),bad:true},
+        {label:"Natural texture",val:clamp(v.texture),bad:false},
+        {label:"Lighting & physics",val:clamp(v.lighting),bad:false},
+        {label:"Scene plausibility",val:clamp(v.context),bad:false}
+      ],
+      redFlags:arr(v.aiSigns),trustSignals:arr(v.realSigns),claimsToVerify:arr(v.observations),tips:arr(v.tips),
+      topic:String(v.topic||"").slice(0,40),about:String(v.about||"").slice(0,800),reasons:arr(v.reasons),
+      probs:normProbs(v.prediction,clamp(v.score)),predText:String(v.predictionText||"").slice(0,600),
+      confidence:normConf(v.confidence),confWhy:String(v.confidenceWhy||"").slice(0,240),
+      background:String(v.background||"").slice(0,800),terms:arrTerms(v.terms),bottomLine:String(v.bottomLine||"").slice(0,220)
+    };
+  }
+
+  var MSTEPS=["Reading the file and metadata…","Looking for AI-tool traces…","Examining textures and noise…","Checking lighting and physics…","Calculating authenticity score…"];
+  $("goM").onclick=async function(){
+    if(busy)return;
+    $("err").classList.remove("on");
+    if(!curFile){showErr("Please choose an image or a video first.");return;}
+    busy=true;$("goM").disabled=true;$("goM").textContent="Analyzing…";
+    $("result").classList.remove("on");
+    $("scan").classList.add("on");$("pbox").classList.add("scanning");
+    var si=0;$("steps").textContent=MSTEPS[0];
+    var iv=setInterval(function(){si=(si+1)%MSTEPS.length;$("steps").textContent=MSTEPS[si];},1500);
+    var minWait=new Promise(function(r){setTimeout(r,2400)});
+    var canvases=[],noises=[],w=0,h=0,dur=0,note=null;
+    try{
+      if(curKind==="image"){
+        var im=await loadImg(curURL);
+        w=im.naturalWidth;h=im.naturalHeight;
+        canvases=[toCanvas(im,w,h,1024)];
+        noises=[noiseOf(im,w,h)];
+      }else{
+        var vf=await getVideoFrames(curURL);
+        canvases=vf.frames;noises=vf.noises;w=vf.w;h=vf.h;dur=vf.duration;
+      }
+    }catch(e){note="This file could not be decoded by your browser, so only file-data checks were used.";}
+    var loc=await localMedia(curFile,curKind,w,h,dur,noises);
+    var ex=mediaExtras(loc,curFile,curKind,w,h,dur);
+    var ai=null,aiFailed=false;
+    try{ai=await analyzeMediaAI(curKind,canvases);}catch(e){aiFailed=true;}
+    await minWait;
+    var res;
+    if(ai){
+      res={mode:"media",verdict:ai.verdict,score:ai.score,title:ai.title,summary:ai.summary,
+           meters:ai.aiMeters.concat([{label:"Metadata & origin",val:loc.meters[1].val,bad:false}]),
+           redFlags:ai.redFlags,trustSignals:ai.trustSignals,claimsToVerify:ai.claimsToVerify,tips:ai.tips,
+           topic:ai.topic,about:ai.about,reasons:ai.reasons,probs:ai.probs,predText:ai.predText,confidence:ai.confidence,
+           confWhy:ai.confWhy,background:ai.background,terms:ai.terms,bottomLine:ai.bottomLine,
+           engine:"Gemini AI vision + file forensics"};
+      if(loc.aiTag){res.score=Math.min(res.score,12);res.verdict="fake";res.redFlags.unshift(loc.redFlags[0]);res.probs=probsFromScore(res.score);}
+      else if(loc.cam){res.score=Math.min(95,res.score+5);res.trustSignals.unshift(loc.trustSignals[0]);}
+      if(!res.tips.length)res.tips=["Run a reverse image search (Google Lens, TinEye) to find the original.","Check the account or site that posted it and when.","Look for Content Credentials (C2PA) or an official source."];
+      fillMissing(res,ex);
+    }else{
+      var fake=loc.verdict==="fake",real=loc.verdict==="genuine";
+      res={mode:"media",verdict:loc.verdict,score:loc.score,
+           title:fake?"Signs of AI generation":real?"Looks like a real capture":"Can’t tell from file data",
+           summary:fake?"The file data and image statistics point towards AI generation, but this basic check is not proof."
+                      :real?"The file data and image statistics look like a normal camera capture, but this basic check is not proof."
+                      :"File-level checks are not conclusive. AI vision analysis gives a much better answer.",
+           meters:loc.meters,redFlags:loc.redFlags,trustSignals:loc.trustSignals,claimsToVerify:loc.claimsToVerify,
+           tips:["Run a reverse image search (Google Lens, TinEye) to find the original.","Check who posted it first and when, and whether trusted outlets used it.","Zoom in on hands, teeth, text, reflections and backgrounds for odd details."],
+           engine:"Offline forensic checks (metadata, size, noise)"};
+      fillMissing(res,ex);
+    }
+    clearInterval(iv);
+    $("scan").classList.remove("on");$("pbox").classList.remove("scanning");
+    render(res);
+    if(!ai){
+      var msg=note||(aiFailed?"AI vision was unavailable, so the offline forensic checks were used instead.":"AI vision is not available here, so the offline forensic checks were used instead.");
+      showErr(msg);
+    }else if(note){showErr(note);}
+    busy=false;$("goM").disabled=false;$("goM").textContent="🧬 Detect AI-Generated";
+  };
+})();
+</script>
+</body>
+</html>
